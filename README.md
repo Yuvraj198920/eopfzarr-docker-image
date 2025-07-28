@@ -2,12 +2,19 @@
 
 This container provides a complete environment for working with EOPF (European Open Science Platform Framework) Zarr-based Earth Observation data using a custom GDAL driver.
 
+## 🚀 Quick Start with MyBinder
+
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/Yuvraj198920/eopfzarr-docker-image/HEAD)
+
+Click the badge above to launch the environment directly in mybinder.org with the EOPF-Zarr driver pre-installed!
+
 ## Features
 
 - **Ubuntu 25.04** base with **GDAL 3.10.x**
 - **Custom EOPF-Zarr GDAL driver** for reading Zarr-based EO data
 - **Complete EOPF Python environment** with geospatial libraries
 - **JupyterLab** ready for interactive data analysis
+- **MyBinder compatibility** for zero-setup cloud deployment
 - **JupyterHub compatibility** for deployment at https://jupyterhub.user.eopf.eodc.eu
 
 ## Environment Details
@@ -54,6 +61,33 @@ docker push your-registry/eopf-zarr-driver:latest
 
 ## Testing
 
+### MyBinder Testing
+After launching the mybinder environment:
+
+1. **Run the validation script**:
+   ```bash
+   python test-environment.py
+   ```
+
+2. **Open the test notebook**:
+   Navigate to `examples/test_eopf_driver.ipynb` and run all cells
+
+3. **Manual verification**:
+   ```python
+   import os
+   os.environ['GDAL_DRIVER_PATH'] = '/opt/eopf-zarr/drivers'
+   
+   from osgeo import gdal
+   gdal.AllRegister()
+   print(f"GDAL drivers: {gdal.GetDriverCount()}")
+   
+   # Check for EOPF-Zarr driver
+   driver = gdal.GetDriverByName('EOPFZARR')
+   if driver:
+       print(f"✅ EOPF-Zarr driver: {driver.GetDescription()}")
+   ```
+
+### Local Testing
 The container includes a built-in test script to verify the environment:
 
 ```bash

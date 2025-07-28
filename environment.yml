@@ -1,16 +1,17 @@
-name: eopf-zarr-driver
+name: eopf-zarr
 channels:
   - conda-forge
   - defaults
 dependencies:
   # Core scientific computing
+  - python>=3.9
   - numpy
   - scipy  
   - pandas
   - matplotlib
   
   # Geospatial and Earth Observation
-  - gdal>=3.10
+  - gdal>=3.4,<3.8  # More compatible version range for mybinder
   - xarray
   - zarr<3
   - dask
@@ -25,19 +26,25 @@ dependencies:
   - netcdf4
   - h5py
   
-  # Jupyter ecosystem
+  # Jupyter ecosystem  
   - jupyter
-  - jupyterlab
-  - jupyterhub
+  - jupyterlab>=3.0
   - ipywidgets
   - ipykernel
   - notebook
   - nbclassic
   
-  # Development and testing
-  - pytest
-  - pytest-cov
+  # Build tools (needed for compiling the driver)
+  - cmake
+  - make
+  - compilers
+  - pkg-config
   
   # Additional utilities
   - pip
   - git
+
+  # Pip dependencies (for packages not available in conda-forge)
+  - pip:
+    - pytest
+    - pytest-cov
