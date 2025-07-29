@@ -98,7 +98,8 @@ if git clone https://github.com/EOPF-Sample-Service/GDAL-ZARR-EOPF.git source; t
     # The CMakeLists.txt from this repo already handles GDAL compatibility automatically
     echo "ℹ️ Using original CMakeLists.txt with automatic GDAL compatibility detection"
     
-    cd ../build
+    # Go to build directory (we're currently in /home/jovyan/eopf-zarr)
+    cd build
     
     # Configure build
     echo "⚙️ Configuring build with CMake..."
