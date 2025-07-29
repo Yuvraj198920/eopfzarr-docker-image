@@ -2,23 +2,32 @@ name: eopf-binder
 channels:
   - conda-forge
 dependencies:
-  # Essential packages only
+  # Essential packages
   - python=3.9
   - jupyter
   - jupyterlab
   - gdal=3.6.*
+  - libgdal=3.6.*
+  - gdal-dev
   - numpy
   - xarray
   - zarr<3
   - matplotlib
   - ipywidgets
   
-  # Build tools for optional driver build
+  # Build tools for driver build (more complete)
   - cmake
   - make
   - compilers
+  - pkg-config
+  - git
+  
+  # Additional GDAL dependencies
+  - proj
+  - geos
   
   # Pip packages
   - pip
   - pip:
     - rasterio
+    - geopandas
