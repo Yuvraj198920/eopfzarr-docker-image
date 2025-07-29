@@ -1,0 +1,515 @@
+#!/bin/bash
+# Enhanced postBuild for EOPF-Zarr driver in MyBinder
+
+set -euo pipefail
+
+echo "🔧 Setting up EOPF-Zarr driver environment for MyBinder..."
+
+# Set CONDA_PREFIX if not set (for Docker builds)
+if [ -z "${CONDA_PREFIX:-}" ]; then
+    # Try common conda locations
+    if [ -d "/srv/conda/envs/notebook" ]; then
+        export CONDA_PREFIX="/srv/conda/envs/notebook"
+    elif [ -d "/opt/conda" ]; then
+        export CONDA_PREFIX="/opt/conda"
+    elif [ -d "/srv/conda" ]; then
+        export CONDA_PREFIX="/srv/conda"
+    else
+        export CONDA_PREFIX="/usr/local"
+    fi
+    echo "🔧 Set CONDA_PREFIX to: $CONDA_PREFIX"
+fi
+
+# Verify conda is available
+if ! command -v conda &> /dev/null; then
+    echo "⚠️ Conda not found, skipping development package installation"
+    SKIP_CONDA_INSTALL=true
+else
+    SKIP_CONDA_INSTALL=false
+fi
+
+# Install additional development packages not in environment.yml
+if [ "$SKIP_CONDA_INSTALL" = false ]; then
+    echo "📦 Installing any additional GDAL development headers..."
+    conda install -y -c conda-forge libgdal-devel gdal-devel 2>/dev/null || echo "⚠️ Development packages not available, using GDAL 3.8+ from environment"
+else
+    echo "⚠️ Skipping conda package installation - conda not available"
+fi
+
+# Create directories
+mkdir -p /home/jovyan/eopf-zarr/drivers
+mkdir -p /home/jovyan/eopf-zarr/build
+
+# Set environment variables permanently
+echo 'export GDAL_DRIVER_PATH="/home/jovyan/eopf-zarr/drivers"' >> ~/.bashrc
+echo 'export GDAL_DATA="${CONDA_PREFIX:-/usr/local}/share/gdal"' >> ~/.bashrc
+echo 'export PROJ_LIB="${CONDA_PREFIX:-/usr/local}/share/proj"' >> ~/.bashrc
+
+# Also set for current session
+export GDAL_DRIVER_PATH="/home/jovyan/eopf-zarr/drivers"
+export GDAL_DATA="${CONDA_PREFIX}/share/gdal"
+export PROJ_LIB="${CONDA_PREFIX}/share/proj"
+
+echo "📁 Environment variables set:"
+echo "  GDAL_DRIVER_PATH: $GDAL_DRIVER_PATH"
+echo "  GDAL_DATA: $GDAL_DATA"
+echo "  PROJ_LIB: $PROJ_LIB"
+echo "  CONDA_PREFIX: $CONDA_PREFIX"
+
+# Detect GDAL paths early
+echo "🔍 Detecting GDAL installation paths..."
+if [ -n "${CONDA_PREFIX:-}" ]; then
+    GDAL_CONFIG_PATH=$(which gdal-config 2>/dev/null || echo "${CONDA_PREFIX}/bin/gdal-config")
+    GDAL_INCLUDE_DIR="${CONDA_PREFIX}/include"
+    GDAL_LIBRARY_DIR="${CONDA_PREFIX}/lib"
+else
+    GDAL_CONFIG_PATH=$(which gdal-config 2>/dev/null || echo "/usr/bin/gdal-config")
+    GDAL_INCLUDE_DIR="/usr/include"
+    GDAL_LIBRARY_DIR="/usr/lib"
+fi
+
+# Verify GDAL config exists
+if [ ! -f "$GDAL_CONFIG_PATH" ]; then
+    echo "⚠️ gdal-config not found at $GDAL_CONFIG_PATH, trying alternatives..."
+    for alt_path in "/usr/bin/gdal-config" "/usr/local/bin/gdal-config" "${CONDA_PREFIX}/bin/gdal-config"; do
+        if [ -f "$alt_path" ]; then
+            GDAL_CONFIG_PATH="$alt_path"
+            echo "✅ Found gdal-config at: $GDAL_CONFIG_PATH"
+            break
+        fi
+    done
+fi
+
+echo "🔍 GDAL paths:"
+echo "  GDAL_CONFIG: $GDAL_CONFIG_PATH"
+echo "  GDAL_INCLUDE: $GDAL_INCLUDE_DIR"
+echo "  GDAL_LIBRARY: $GDAL_LIBRARY_DIR"
+
+# Download pre-built EOPF-Zarr driver from GitHub Actions
+echo "� Downloading pre-built EOPF-Zarr driver..."
+
+cd /home/jovyan/eopf-zarr
+
+# Get the latest successful build artifact URL
+# Using the Release build artifact for Linux from GitHub Actions
+ARTIFACT_URL="https://github.com/EOPF-Sample-Service/GDAL-ZARR-EOPF/actions/artifacts"
+LATEST_WORKFLOW_URL="https://api.github.com/repos/EOPF-Sample-Service/GDAL-ZARR-EOPF/actions/runs"
+
+echo "🔍 Finding latest successful build..."
+
+# Try to get the latest release artifact directly
+# For now, we'll use a known working artifact URL from the recent successful build
+# This should be the gdal_EOPFZarr-Release artifact (Linux Release build)
+
+# Alternative approach: Download from a specific known good run
+# We'll use curl to download the artifact from the GitHub Actions
+echo "⬇️ Downloading EOPF-Zarr driver binary..."
+
+# Create a temporary approach using the source repo and getting latest release info
+if git clone --depth 1 https://github.com/EOPF-Sample-Service/GDAL-ZARR-EOPF.git temp_source; then
+    echo "✅ Cloned source for artifact info"
+    
+    # For now, let's try a different approach - check if they have releases or latest builds
+    # Let's try downloading the driver using wget/curl from the GitHub API
+    
+    echo "🌐 Attempting to download pre-built driver..."
+    
+    # Try to download from the latest successful workflow artifact
+    # Note: GitHub requires authentication for artifact downloads, so let's use an alternative approach
+    
+    # Alternative: Check if there are any pre-built drivers in the repo releases
+    if curl -s "https://api.github.com/repos/EOPF-Sample-Service/GDAL-ZARR-EOPF/releases/latest" | grep -q "tag_name"; then
+        echo "📦 Found GitHub releases, attempting download..."
+        RELEASE_URL=$(curl -s "https://api.github.com/repos/EOPF-Sample-Service/GDAL-ZARR-EOPF/releases/latest" | grep "browser_download_url.*gdal.*so" | cut -d '"' -f 4 | head -1)
+        if [ -n "$RELEASE_URL" ]; then
+            wget -O drivers/gdal_EOPFZarr.so "$RELEASE_URL"
+            echo "✅ Downloaded driver from GitHub releases"
+        else
+            echo "⚠️ No binary releases found, falling back to manual approach"
+        fi
+    else
+        echo "ℹ️ No GitHub releases available, using alternative method..."
+        
+        # Since artifacts require authentication, let's build a minimal version
+        # We'll create a simple solution by manually providing a known working binary
+        # or building from source with optimized settings
+        
+        echo "🔨 Using lightweight build approach..."
+        cd temp_source
+        
+        # Use a simple build that should work with GDAL 3.8+
+        if [ -f "CMakeLists.txt" ]; then
+            mkdir -p build_minimal
+            cd build_minimal
+            
+            echo "⚙️ Quick CMake configuration..."
+            if cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$CONDA_PREFIX"; then
+                echo "🔨 Quick build..."
+                if make -j2; then
+                    if [ -f "gdal_EOPFZarr.so" ]; then
+                        cp gdal_EOPFZarr.so ../../drivers/
+                        chmod 755 ../../drivers/gdal_EOPFZarr.so
+                        echo "✅ Driver built and installed successfully!"
+                    else
+                        echo "❌ Driver binary not found after build"
+                        ls -la .
+                    fi
+                else
+                    echo "❌ Build failed"
+                fi
+            else
+                echo "❌ CMake configuration failed"
+            fi
+        else
+            echo "❌ CMakeLists.txt not found"
+        fi
+    fi
+    
+    # Cleanup
+    cd /home/jovyan/eopf-zarr
+    rm -rf temp_source
+else
+    echo "❌ Failed to clone source repository"
+fi
+
+# Verify driver installation
+if [ -f "drivers/gdal_EOPFZarr.so" ]; then
+    echo "✅ EOPF-Zarr driver installed successfully!"
+    echo "📁 Driver location: /home/jovyan/eopf-zarr/drivers/gdal_EOPFZarr.so"
+    echo "📊 Driver file size: $(ls -lh drivers/gdal_EOPFZarr.so | awk '{print $5}')"
+    
+    # Verify the driver file
+    ls -la drivers/
+else
+    echo "❌ Driver installation failed"
+    echo "📂 Contents of drivers directory:"
+    ls -la drivers/ || echo "Drivers directory not found"
+fi
+
+# Create comprehensive test notebook
+cat > /home/jovyan/test_eopf_driver.ipynb << 'EOF'
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# EOPF-Zarr Driver Test - MyBinder Edition\n",
+    "\n",
+    "This notebook validates the EOPF-Zarr GDAL driver installation in MyBinder."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import os\n",
+    "import sys\n",
+    "print(f'🐍 Python: {sys.version}')\n",
+    "print(f'📁 Working directory: {os.getcwd()}')\n",
+    "print(f'🏠 Home directory: {os.path.expanduser(\"~\")}')\n",
+    "\n",
+    "# Set environment variables for this session\n",
+    "os.environ['GDAL_DRIVER_PATH'] = '/home/jovyan/eopf-zarr/drivers'\n",
+    "os.environ['GDAL_DATA'] = os.path.join(os.environ.get('CONDA_PREFIX', ''), 'share', 'gdal')\n",
+    "os.environ['PROJ_LIB'] = os.path.join(os.environ.get('CONDA_PREFIX', ''), 'share', 'proj')\n",
+    "\n",
+    "print(f'\\n🔧 Environment Variables:')\n",
+    "print(f'  GDAL_DRIVER_PATH: {os.environ.get(\"GDAL_DRIVER_PATH\")}')\n",
+    "print(f'  GDAL_DATA: {os.environ.get(\"GDAL_DATA\")}')\n",
+    "print(f'  PROJ_LIB: {os.environ.get(\"PROJ_LIB\")}')\n",
+    "print(f'  CONDA_PREFIX: {os.environ.get(\"CONDA_PREFIX\")}')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Check if driver file exists\n",
+    "import os\n",
+    "driver_file = '/home/jovyan/eopf-zarr/drivers/gdal_EOPFZarr.so'\n",
+    "print(f'📁 Checking driver file: {driver_file}')\n",
+    "\n",
+    "if os.path.exists(driver_file):\n",
+    "    stat = os.stat(driver_file)\n",
+    "    print(f'✅ Driver file exists!')\n",
+    "    print(f'   Size: {stat.st_size} bytes')\n",
+    "    print(f'   Permissions: {oct(stat.st_mode)}')\n",
+    "else:\n",
+    "    print(f'❌ Driver file not found')\n",
+    "    print(f'📂 Contents of eopf-zarr directory:')\n",
+    "    eopf_dir = '/home/jovyan/eopf-zarr'\n",
+    "    if os.path.exists(eopf_dir):\n",
+    "        for root, dirs, files in os.walk(eopf_dir):\n",
+    "            level = root.replace(eopf_dir, '').count(os.sep)\n",
+    "            indent = ' ' * 2 * level\n",
+    "            print(f'{indent}{os.path.basename(root)}/')\n",
+    "            subindent = ' ' * 2 * (level + 1)\n",
+    "            for file in files[:10]:  # Limit to first 10 files\n",
+    "                print(f'{subindent}{file}')\n",
+    "    else:\n",
+    "        print(f'   Directory does not exist')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Test GDAL import and basic functionality\n",
+    "try:\n",
+    "    from osgeo import gdal\n",
+    "    print(f'✅ GDAL imported successfully')\n",
+    "    print(f'📦 GDAL Version: {gdal.VersionInfo()}')\n",
+    "    \n",
+    "    # Register all drivers\n",
+    "    gdal.AllRegister()\n",
+    "    driver_count = gdal.GetDriverCount()\n",
+    "    print(f'📊 Total GDAL drivers: {driver_count}')\n",
+    "    \n",
+    "except ImportError as e:\n",
+    "    print(f'❌ Failed to import GDAL: {e}')\n",
+    "except Exception as e:\n",
+    "    print(f'❌ GDAL error: {e}')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Test EOPF-Zarr driver specifically\n",
+    "try:\n",
+    "    from osgeo import gdal\n",
+    "    \n",
+    "    # Try to get EOPF-Zarr driver by name\n",
+    "    eopf_driver = gdal.GetDriverByName('EOPFZARR')\n",
+    "    \n",
+    "    if eopf_driver:\n",
+    "        print(f'🎉 SUCCESS! EOPF-Zarr driver found!')\n",
+    "        print(f'   Driver name: {eopf_driver.GetDescription()}')\n",
+    "        \n",
+    "        # Get driver metadata\n",
+    "        metadata = eopf_driver.GetMetadata()\n",
+    "        if metadata:\n",
+    "            print(f'   Metadata: {metadata}')\n",
+    "        else:\n",
+    "            print(f'   No metadata available')\n",
+    "            \n",
+    "        # Test driver capabilities\n",
+    "        print(f'   Can Create: {eopf_driver.GetMetadataItem(\"DCAP_CREATE\") == \"YES\"}')\n",
+    "        print(f'   Can CreateCopy: {eopf_driver.GetMetadataItem(\"DCAP_CREATECOPY\") == \"YES\"}')\n",
+    "        \n",
+    "    else:\n",
+    "        print(f'⚠️ EOPF-Zarr driver not found by name')\n",
+    "        \n",
+    "        # Search for Zarr-related drivers\n",
+    "        print(f'🔍 Searching for Zarr-related drivers...')\n",
+    "        zarr_drivers = []\n",
+    "        for i in range(gdal.GetDriverCount()):\n",
+    "            driver = gdal.GetDriver(i)\n",
+    "            desc = driver.GetDescription().lower()\n",
+    "            if 'zarr' in desc or 'eopf' in desc:\n",
+    "                zarr_drivers.append(driver.GetDescription())\n",
+    "        \n",
+    "        if zarr_drivers:\n",
+    "            print(f'   Found related drivers: {zarr_drivers}')\n",
+    "        else:\n",
+    "            print(f'   No Zarr-related drivers found')\n",
+    "            \n",
+    "        # List first 20 drivers for debugging\n",
+    "        print(f'\\n📋 Available drivers (first 20):')\n",
+    "        for i in range(min(20, gdal.GetDriverCount())):\n",
+    "            driver = gdal.GetDriver(i)\n",
+    "            print(f'  {i+1:2d}: {driver.GetDescription()}')\n",
+    "        \n",
+    "        if gdal.GetDriverCount() > 20:\n",
+    "            print(f'  ... and {gdal.GetDriverCount() - 20} more drivers')\n",
+    "            \n",
+    "except Exception as e:\n",
+    "    print(f'❌ Error testing EOPF-Zarr driver: {e}')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Test other essential packages\n",
+    "packages_to_test = [\n",
+    "    'numpy', 'xarray', 'zarr', 'matplotlib', \n",
+    "    'rasterio', 'geopandas'\n",
+    "]\n",
+    "\n",
+    "print('📦 Testing other packages:')\n",
+    "for pkg in packages_to_test:\n",
+    "    try:\n",
+    "        module = __import__(pkg)\n",
+    "        version = getattr(module, '__version__', 'unknown')\n",
+    "        print(f'  ✅ {pkg}: {version}')\n",
+    "    except ImportError:\n",
+    "        print(f'  ❌ {pkg}: not available')\n",
+    "    except Exception as e:\n",
+    "        print(f'  ⚠️ {pkg}: error - {e}')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Force driver registration with debug output\n",
+    "print('🔄 Attempting manual driver registration...')\n",
+    "\n",
+    "try:\n",
+    "    from osgeo import gdal\n",
+    "    \n",
+    "    # Enable debug output\n",
+    "    gdal.SetConfigOption('CPL_DEBUG', 'ON')\n",
+    "    gdal.SetConfigOption('GDAL_DRIVER_PATH', '/home/jovyan/eopf-zarr/drivers')\n",
+    "    \n",
+    "    # Force re-registration\n",
+    "    gdal.AllRegister()\n",
+    "    \n",
+    "    print(f'📊 Drivers after forced registration: {gdal.GetDriverCount()}')\n",
+    "    \n",
+    "    # Try again to find EOPF driver\n",
+    "    eopf_driver = gdal.GetDriverByName('EOPFZARR')\n",
+    "    if eopf_driver:\n",
+    "        print(f'🎉 EOPF-Zarr driver found after forced registration!')\n",
+    "    else:\n",
+    "        print(f'⚠️ EOPF-Zarr driver still not found')\n",
+    "    \n",
+    "    # Disable debug output\n",
+    "    gdal.SetConfigOption('CPL_DEBUG', 'OFF')\n",
+    "    \n",
+    "except Exception as e:\n",
+    "    print(f'❌ Error during forced registration: {e}')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Force driver registration with debug output\n",
+    "print('🔄 Attempting manual driver registration...')\n",
+    "\n",
+    "try:\n",
+    "    from osgeo import gdal\n",
+    "    \n",
+    "    # Enable debug output\n",
+    "    path = '\"/vsicurl/https://objects.eodc.eu/e05ab01a9d56408d82ac32d69a5aae2a:202507-s02msil1c/27/products/cpm_v256/S2C_MSIL1C_20250727T152831_N0511_R111_T31XEM_20250727T161934.zarr\"'\n",
+    "    zarr_path = \"EOPFZARR:\" + path\n",
+    "    \n"
+    "except Exception as e:\n",
+    "    print(f'❌ Error during manual driver registration: {e}')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Force driver registration with debug output\n",
+    "print('🔄 Attempting manual driver registration...')\n",
+    "\n",
+    "ds = gdal.Open(zarr_path)\n",
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Force driver registration with debug output\n",
+    "print('🔄 Attempting manual driver registration...')\n",
+    "\n",
+    "ds\n",
+   ]
+  },   {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Force driver registration with debug output\n",
+    "print('🔄 Attempting manual driver registration...')\n",
+    "\n",
+    "ds.GetMetadata()\n",
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Force driver registration with debug output\n",
+    "print('🔄 Attempting manual driver registration...')\n",
+    "\n",
+    "sub = ds.GetSubDatasets()\n",
+    "print(f'Found {len(sub)} subdatasets:')\n",
+    "sub[50]\n",
+   ]
+  },
+    {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Force driver registration with debug output\n",
+    "print('🔄 Attempting manual driver registration...')\n",
+    "\n",
+    "subds = gdal.Open(sub[50][0])\n",
+   ]
+  },
+     {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Force driver registration with debug output\n",
+    "print('🔄 Attempting manual driver registration...')\n",
+    "\n",
+    "subds\n",
+   ]
+  },
+       {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Force driver registration with debug output\n",
+    "print('🔄 Attempting manual driver registration...')\n",
+    "\n",
+    "subds.GetMetadata()\n",
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},
+  "language_info": {"name": "python", "version": "3.9.0"}
+ },
+ "nbformat": 4,
+ "nbformat_minor": 4
+}
+EOF
+
+echo "✅ MyBinder EOPF-Zarr setup complete!"
+echo "📝 Test notebook created: /home/jovyan/test_eopf_driver.ipynb"
+echo "🎯 To test: Open the notebook and run all cells"
