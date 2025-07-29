@@ -1,0 +1,35 @@
+name: eopf-zarr-simple
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  # Core Python stack
+  - python=3.9
+  - pip
+  
+  # Essential scientific computing
+  - numpy
+  - scipy
+  - pandas
+  - matplotlib
+  
+  # Geospatial stack (minimal versions for faster install)
+  - gdal=3.6.*
+  - xarray
+  - zarr<3
+  - dask-core
+  - rasterio
+  
+  # Jupyter essentials only
+  - jupyter
+  - jupyterlab
+  - ipywidgets
+  
+  # Build tools for driver compilation
+  - cmake
+  - make
+  - compilers
+  
+  # Pip packages for anything not in conda-forge
+  - pip:
+    - geopandas

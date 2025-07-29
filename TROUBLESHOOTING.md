@@ -1,5 +1,60 @@
 # EOPF-Zarr Driver Troubleshooting Guide for MyBinder
 
+## MyBinder Spawn Timeout (300 seconds) - URGENT FIX
+
+### Problem
+```
+Spawn failed: pod did not start in 300 seconds!
+Launch attempt failed, retrying...
+```
+
+### Root Cause
+The container builds successfully but the startup process takes too long, causing MyBinder to timeout.
+
+### **IMMEDIATE SOLUTION**
+
+#### Option 1: Use Simplified Environment (Recommended)
+1. **Rename current files** to backup:
+   ```bash
+   mv environment.yml environment-full.yml
+   mv postBuild postBuild-full
+   ```
+
+2. **Use simplified versions**:
+   ```bash
+   mv environment-simple.yml environment.yml
+   mv postBuild-simple postBuild
+   ```
+
+3. **Commit and push** to trigger new build:
+   ```bash
+   git add .
+   git commit -m "Fix MyBinder timeout with simplified environment"
+   git push
+   ```
+
+#### Option 2: Remove Heavy Startup Processes
+If you want to keep the full environment, make these changes:
+
+1. **Simplify the `start` script**:
+   ```bash
+   #!/bin/bash
+   export GDAL_DRIVER_PATH="/opt/eopf-zarr/drivers"
+   exec "$@"
+   ```
+
+2. **Remove heavy validation from `postBuild`**:
+   - Remove GDAL testing code
+   - Remove driver validation
+   - Keep only file copying and environment setup
+
+### **Why This Happens**
+
+1. **Heavy startup scripts** - Complex validation during container startup
+2. **Resource intensive operations** - GDAL initialization with many drivers
+3. **Network timeouts** - Git cloning during startup
+4. **Build vs Runtime confusion** - Doing build tasks during startup
+
 ## Common Issues and Solutions
 
 ### 1. Driver Not Detected After MyBinder Launch

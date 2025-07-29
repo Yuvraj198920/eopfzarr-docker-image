@@ -1,31 +1,15 @@
 #!/bin/bash
 
-# Start script for mybinder.org
-# This ensures the EOPF-Zarr driver environment is properly configured
+# Optimized start script for mybinder.org
+# This ensures fast startup to avoid 300-second timeout
 
-# Set GDAL environment variables
+# Set GDAL environment variables quickly
 export GDAL_DRIVER_PATH="/opt/eopf-zarr/drivers"
 export GDAL_DATA="/usr/share/gdal"
 export PROJ_LIB="/usr/share/proj"
 
-# Verify driver is available
-echo "🔍 Initializing EOPF-Zarr driver environment..."
+# Quick startup - minimal checking to avoid timeout
+echo "🚀 Starting EOPF-Zarr environment..."
 
-# Check if driver file exists
-if [ -f "/opt/eopf-zarr/drivers/gdal_EOPFZarr.so" ]; then
-    echo "✅ EOPF-Zarr driver found"
-else
-    echo "⚠️ EOPF-Zarr driver not found - may need to rebuild"
-fi
-
-# Initialize GDAL with the custom driver
-python3 -c "
-import os
-os.environ['GDAL_DRIVER_PATH'] = '/opt/eopf-zarr/drivers'
-from osgeo import gdal
-gdal.AllRegister()
-print(f'GDAL initialized with {gdal.GetDriverCount()} drivers')
-"
-
-# Start the notebook server
+# Start the notebook server immediately
 exec "$@"
