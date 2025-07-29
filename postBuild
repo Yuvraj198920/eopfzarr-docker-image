@@ -351,6 +351,111 @@ cat > /home/jovyan/test_eopf_driver.ipynb << 'EOF'
     "except Exception as e:\n",
     "    print(f'❌ Error during forced registration: {e}')"
    ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Force driver registration with debug output\n",
+    "print('🔄 Attempting manual driver registration...')\n",
+    "\n",
+    "try:\n",
+    "    from osgeo import gdal\n",
+    "    \n",
+    "    # Enable debug output\n",
+    "    path = '\"/vsicurl/https://objects.eodc.eu/e05ab01a9d56408d82ac32d69a5aae2a:202507-s02msil1c/27/products/cpm_v256/S2C_MSIL1C_20250727T152831_N0511_R111_T31XEM_20250727T161934.zarr\"'\n",
+    "    zarr_path = \"EOPFZARR:\" + path\n",
+    "    \n"
+    "except Exception as e:\n",
+    "    print(f'❌ Error during manual driver registration: {e}')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Force driver registration with debug output\n",
+    "print('🔄 Attempting manual driver registration...')\n",
+    "\n",
+    "ds = gdal.Open(zarr_path)\n",
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Force driver registration with debug output\n",
+    "print('🔄 Attempting manual driver registration...')\n",
+    "\n",
+    "ds\n",
+   ]
+  },   {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Force driver registration with debug output\n",
+    "print('🔄 Attempting manual driver registration...')\n",
+    "\n",
+    "ds.GetMetadata()\n",
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Force driver registration with debug output\n",
+    "print('🔄 Attempting manual driver registration...')\n",
+    "\n",
+    "sub = ds.GetSubDatasets()\n",
+    "print(f'Found {len(sub)} subdatasets:')\n",
+    "sub[50]\n",
+   ]
+  },
+    {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Force driver registration with debug output\n",
+    "print('🔄 Attempting manual driver registration...')\n",
+    "\n",
+    "subds = gdal.Open(sub[50][0])\n",
+   ]
+  },
+     {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Force driver registration with debug output\n",
+    "print('🔄 Attempting manual driver registration...')\n",
+    "\n",
+    "subds\n",
+   ]
+  },
+       {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Force driver registration with debug output\n",
+    "print('🔄 Attempting manual driver registration...')\n",
+    "\n",
+    "subds.GetMetadata()\n",
+   ]
   }
  ],
  "metadata": {
