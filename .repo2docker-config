@@ -1,4 +1,4 @@
 # Configuration file for repo2docker
-# This ensures proper file permissions in the mybinder environment
+# Use conda environment instead of Docker for faster builds
 
-buildpack: docker
+buildpack: conda

@@ -5,9 +5,36 @@ set -euo pipefail
 
 echo "🔧 Setting up EOPF-Zarr driver environment for MyBinder..."
 
+# Set CONDA_PREFIX if not set (for Docker builds)
+if [ -z "${CONDA_PREFIX:-}" ]; then
+    # Try common conda locations
+    if [ -d "/srv/conda/envs/notebook" ]; then
+        export CONDA_PREFIX="/srv/conda/envs/notebook"
+    elif [ -d "/opt/conda" ]; then
+        export CONDA_PREFIX="/opt/conda"
+    elif [ -d "/srv/conda" ]; then
+        export CONDA_PREFIX="/srv/conda"
+    else
+        export CONDA_PREFIX="/usr/local"
+    fi
+    echo "🔧 Set CONDA_PREFIX to: $CONDA_PREFIX"
+fi
+
+# Verify conda is available
+if ! command -v conda &> /dev/null; then
+    echo "⚠️ Conda not found, skipping development package installation"
+    SKIP_CONDA_INSTALL=true
+else
+    SKIP_CONDA_INSTALL=false
+fi
+
 # Install additional development packages not in environment.yml
-echo "📦 Installing GDAL development headers..."
-conda install -y -c conda-forge libgdal-devel gdal-devel 2>/dev/null || echo "⚠️ Development packages not available, using what we have"
+if [ "$SKIP_CONDA_INSTALL" = false ]; then
+    echo "📦 Installing GDAL development headers..."
+    conda install -y -c conda-forge libgdal-devel gdal-devel 2>/dev/null || echo "⚠️ Development packages not available, using what we have"
+else
+    echo "⚠️ Skipping conda package installation - conda not available"
+fi
 
 # Create directories
 mkdir -p /home/jovyan/eopf-zarr/drivers
@@ -15,18 +42,19 @@ mkdir -p /home/jovyan/eopf-zarr/build
 
 # Set environment variables permanently
 echo 'export GDAL_DRIVER_PATH="/home/jovyan/eopf-zarr/drivers"' >> ~/.bashrc
-echo 'export GDAL_DATA="$CONDA_PREFIX/share/gdal"' >> ~/.bashrc
-echo 'export PROJ_LIB="$CONDA_PREFIX/share/proj"' >> ~/.bashrc
+echo 'export GDAL_DATA="${CONDA_PREFIX:-/usr/local}/share/gdal"' >> ~/.bashrc
+echo 'export PROJ_LIB="${CONDA_PREFIX:-/usr/local}/share/proj"' >> ~/.bashrc
 
 # Also set for current session
 export GDAL_DRIVER_PATH="/home/jovyan/eopf-zarr/drivers"
-export GDAL_DATA="$CONDA_PREFIX/share/gdal"
-export PROJ_LIB="$CONDA_PREFIX/share/proj"
+export GDAL_DATA="${CONDA_PREFIX}/share/gdal"
+export PROJ_LIB="${CONDA_PREFIX}/share/proj"
 
 echo "📁 Environment variables set:"
 echo "  GDAL_DRIVER_PATH: $GDAL_DRIVER_PATH"
 echo "  GDAL_DATA: $GDAL_DATA"
 echo "  PROJ_LIB: $PROJ_LIB"
+echo "  CONDA_PREFIX: $CONDA_PREFIX"
 
 # Build EOPF-Zarr driver with better error handling
 echo "🔨 Building EOPF-Zarr driver..."
