@@ -99,6 +99,11 @@ if git clone https://github.com/EOPF-Sample-Service/GDAL-ZARR-EOPF.git source; t
     echo "ℹ️ Using original CMakeLists.txt with automatic GDAL compatibility detection"
     echo "ℹ️ CMakeLists.txt will detect RefUnderlyingRasterBand signature and set GDAL_HAS_CONST_REF_UNDERLYING accordingly"
     
+    # Apply minimal compatibility fix for GDAL 3.6.x while CMake detection works
+    echo "🔧 Applying minimal compatibility fix for immediate compilation..."
+    sed -i 's/RefUnderlyingRasterBand() override;/RefUnderlyingRasterBand();/g' source/src/eopfzarr_dataset.h 2>/dev/null || true
+    echo "✅ Applied minimal override fix"
+    
     # Go to build directory (we're currently in /home/jovyan/eopf-zarr)
     cd build
     
