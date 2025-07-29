@@ -66,7 +66,36 @@ echo "📥 Cloning EOPF-Zarr source..."
 if git clone https://github.com/EOPF-Sample-Service/GDAL-ZARR-EOPF.git source; then
     echo "✅ Source cloned successfully"
     
-    cd build
+    # Apply compatibility patch for GDAL 3.6.x
+    echo "🔧 Applying GDAL 3.6.x compatibility patch..."
+    cd source
+    
+    # Check GDAL version for compatibility
+    GDAL_VERSION=$($GDAL_CONFIG_PATH --version 2>/dev/null || echo "3.6.0")
+    echo "🔍 Detected GDAL version: $GDAL_VERSION"
+    
+    # Find and patch the problematic override
+    if [ -f "src/eopfzarr_driver.cpp" ] || [ -f "src/eopfzarr_driver.h" ]; then
+        echo "📝 Patching GDAL compatibility issues..."
+        
+        # Remove the 'override' keyword that's causing the compilation error
+        find . -name "*.h" -o -name "*.hpp" -o -name "*.cpp" | xargs sed -i 's/RefUnderlyingRasterBand() override/RefUnderlyingRasterBand()/g' 2>/dev/null || true
+        
+        # Also handle any other potential override issues
+        find . -name "*.h" -o -name "*.hpp" | xargs sed -i 's/GDALRasterBand \*RefUnderlyingRasterBand() override;/GDALRasterBand *RefUnderlyingRasterBand();/g' 2>/dev/null || true
+        
+        # Check for and fix any other potential GDAL 3.6 compatibility issues
+        echo "🔍 Checking for other potential compatibility issues..."
+        grep -r "override" . --include="*.h" --include="*.hpp" | head -10 || echo "No other override issues found"
+        
+        echo "✅ Compatibility patch applied"
+    else
+        echo "⚠️ Source structure different than expected, skipping patch"
+        echo "📂 Available files:"
+        find . -type f -name "*.cpp" -o -name "*.h" | head -10
+    fi
+    
+    cd ../build
     
     # Configure build
     echo "⚙️ Configuring build with CMake..."
@@ -87,7 +116,9 @@ if git clone https://github.com/EOPF-Sample-Service/GDAL-ZARR-EOPF.git source; t
         -DGDAL_INCLUDE_DIR="$GDAL_INCLUDE_DIR" \
         -DGDAL_LIBRARY_DIR="$GDAL_LIBRARY_DIR" \
         -DCMAKE_PREFIX_PATH="$CONDA_PREFIX" \
-        -DCMAKE_INSTALL_PREFIX=/home/jovyan/eopf-zarr; then
+        -DCMAKE_INSTALL_PREFIX=/home/jovyan/eopf-zarr \
+        -DCMAKE_CXX_FLAGS="-Wno-error -Wno-inconsistent-missing-override" \
+        -DCMAKE_C_FLAGS="-Wno-error"; then
         
         echo "✅ CMake configuration successful"
         
