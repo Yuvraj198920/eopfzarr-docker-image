@@ -95,22 +95,9 @@ echo "📥 Cloning EOPF-Zarr source..."
 if git clone https://github.com/EOPF-Sample-Service/GDAL-ZARR-EOPF.git source; then
     echo "✅ Source cloned successfully"
     
-    # The CMakeLists.txt from this repo already handles GDAL compatibility automatically
+    # The CMakeLists.txt from this repo automatically handles GDAL compatibility
     echo "ℹ️ Using original CMakeLists.txt with automatic GDAL compatibility detection"
-    
-    # However, we still need to patch the source code to remove problematic 'override' keywords
-    echo "🔧 Applying targeted patch for GDAL 3.6 compatibility..."
-    
-    # Remove override keywords that cause compilation errors
-    sed -i 's/RefUnderlyingRasterBand() override/RefUnderlyingRasterBand()/g' source/src/eopfzarr_dataset.h 2>/dev/null || true
-    sed -i 's/RefUnderlyingRasterBand() override/RefUnderlyingRasterBand()/g' source/src/eopfzarr_driver.h 2>/dev/null || true
-    
-    # Check if we successfully patched the files
-    if grep -q "RefUnderlyingRasterBand() override" source/src/eopfzarr_dataset.h 2>/dev/null; then
-        echo "⚠️ Failed to patch eopfzarr_dataset.h - manual fix needed"
-    else
-        echo "✅ Patched eopfzarr_dataset.h successfully"
-    fi
+    echo "ℹ️ CMakeLists.txt will detect RefUnderlyingRasterBand signature and set GDAL_HAS_CONST_REF_UNDERLYING accordingly"
     
     # Go to build directory (we're currently in /home/jovyan/eopf-zarr)
     cd build
@@ -118,11 +105,13 @@ if git clone https://github.com/EOPF-Sample-Service/GDAL-ZARR-EOPF.git source; t
     # Configure build
     echo "⚙️ Configuring build with CMake..."
     echo "ℹ️ Using automatic GDAL compatibility detection from CMakeLists.txt"
+    echo "ℹ️ CMake will test GDAL API signatures and set appropriate defines"
     
     if cmake ../source \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_PREFIX_PATH="$CONDA_PREFIX" \
-        -DCMAKE_INSTALL_PREFIX=/home/jovyan/eopf-zarr; then
+        -DCMAKE_INSTALL_PREFIX=/home/jovyan/eopf-zarr \
+        -DCMAKE_VERBOSE_MAKEFILE=ON; then
         
         echo "✅ CMake configuration successful"
         
