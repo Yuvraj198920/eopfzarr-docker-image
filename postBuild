@@ -5,6 +5,10 @@ set -euo pipefail
 
 echo "🔧 Setting up EOPF-Zarr driver environment for MyBinder..."
 
+# Install additional development packages not in environment.yml
+echo "📦 Installing GDAL development headers..."
+conda install -y -c conda-forge libgdal-devel gdal-devel 2>/dev/null || echo "⚠️ Development packages not available, using what we have"
+
 # Create directories
 mkdir -p /home/jovyan/eopf-zarr/drivers
 mkdir -p /home/jovyan/eopf-zarr/build
@@ -38,9 +42,23 @@ if git clone https://github.com/EOPF-Sample-Service/GDAL-ZARR-EOPF.git source; t
     
     # Configure build
     echo "⚙️ Configuring build with CMake..."
+    
+    # Find GDAL installation paths
+    GDAL_CONFIG_PATH=$(which gdal-config 2>/dev/null || echo "$CONDA_PREFIX/bin/gdal-config")
+    GDAL_INCLUDE_DIR="$CONDA_PREFIX/include"
+    GDAL_LIBRARY_DIR="$CONDA_PREFIX/lib"
+    
+    echo "🔍 GDAL paths:"
+    echo "  GDAL_CONFIG: $GDAL_CONFIG_PATH"
+    echo "  GDAL_INCLUDE: $GDAL_INCLUDE_DIR"
+    echo "  GDAL_LIBRARY: $GDAL_LIBRARY_DIR"
+    
     if cmake ../source \
         -DCMAKE_BUILD_TYPE=Release \
-        -DGDAL_CONFIG="$CONDA_PREFIX/bin/gdal-config" \
+        -DGDAL_CONFIG="$GDAL_CONFIG_PATH" \
+        -DGDAL_INCLUDE_DIR="$GDAL_INCLUDE_DIR" \
+        -DGDAL_LIBRARY_DIR="$GDAL_LIBRARY_DIR" \
+        -DCMAKE_PREFIX_PATH="$CONDA_PREFIX" \
         -DCMAKE_INSTALL_PREFIX=/home/jovyan/eopf-zarr; then
         
         echo "✅ CMake configuration successful"

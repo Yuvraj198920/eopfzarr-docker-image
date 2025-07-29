@@ -8,19 +8,20 @@ dependencies:
   - jupyterlab
   - gdal=3.6.*
   - libgdal=3.6.*
-  - gdal-dev
   - numpy
   - xarray
   - zarr<3
   - matplotlib
   - ipywidgets
   
-  # Build tools for driver build (more complete)
+  # Build tools for driver build
   - cmake
   - make
   - compilers
   - pkg-config
   - git
+  - cxx-compiler
+  - c-compiler
   
   # Additional GDAL dependencies
   - proj
