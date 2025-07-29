@@ -1,0 +1,88 @@
+#!/bin/bash
+set -euo pipefail
+
+# Optimized post-build script for mybinder.org
+# Reduced validation to speed up build process
+
+echo "🔧 Running optimized post-build setup for EOPF-Zarr driver..."
+
+# Ensure GDAL environment variables are set
+export GDAL_DRIVER_PATH="/opt/eopf-zarr/drivers"
+export GDAL_DATA="/usr/share/gdal" 
+export PROJ_LIB="/usr/share/proj"
+
+# Quick check for driver file
+if [ -f "/opt/eopf-zarr/drivers/gdal_EOPFZarr.so" ]; then
+    echo "✅ EOPF-Zarr driver file found"
+else
+    echo "⚠️ EOPF-Zarr driver file NOT found - checking build artifacts..."
+    
+    # Try to find the driver in build directory
+    if [ -f "/opt/eopf-zarr/build/gdal_EOPFZarr.so" ]; then
+        echo "� Found driver in build directory, copying..."
+        mkdir -p /opt/eopf-zarr/drivers
+        cp /opt/eopf-zarr/build/gdal_EOPFZarr.so /opt/eopf-zarr/drivers/
+        chmod 755 /opt/eopf-zarr/drivers/gdal_EOPFZarr.so
+        echo "✅ Driver copied successfully"
+    else
+        echo "❌ Driver not found in build directory either"
+    fi
+fi
+
+# Set up permanent environment variables for the user
+echo "🔧 Setting up environment variables..."
+echo 'export GDAL_DRIVER_PATH="/opt/eopf-zarr/drivers"' >> ${HOME}/.profile
+echo 'export GDAL_DATA="/usr/share/gdal"' >> ${HOME}/.profile
+echo 'export PROJ_LIB="/usr/share/proj"' >> ${HOME}/.profile
+
+# Create a simple test notebook (minimal version)
+echo "📝 Creating minimal test notebook..."
+mkdir -p ${HOME}/examples
+cat > ${HOME}/examples/test_eopf_driver.ipynb << 'EOF'
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": ["# EOPF-Zarr Driver Quick Test"]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import os\n",
+    "os.environ['GDAL_DRIVER_PATH'] = '/opt/eopf-zarr/drivers'\n",
+    "print('Environment configured')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "try:\n",
+    "    from osgeo import gdal\n",
+    "    gdal.AllRegister()\n",
+    "    print(f'GDAL loaded with {gdal.GetDriverCount()} drivers')\n",
+    "    driver = gdal.GetDriverByName('EOPFZARR')\n",
+    "    if driver:\n",
+    "        print(f'EOPF-Zarr driver found: {driver.GetDescription()}')\n",
+    "    else:\n",
+    "        print('EOPF-Zarr driver not found by name')\n",
+    "except Exception as e:\n",
+    "    print(f'Error: {e}')"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"}
+ },
+ "nbformat": 4,
+ "nbformat_minor": 4
+}
+EOF
+
+echo "✅ Optimized post-build setup completed!"
