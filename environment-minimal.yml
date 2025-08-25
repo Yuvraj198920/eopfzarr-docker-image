@@ -1,8 +1,0 @@
-name: base
-dependencies:
-  - python=3.9
-  - gdal
-  - jupyter
-  - numpy
-  - xarray
-  - zarr

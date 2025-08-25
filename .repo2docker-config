@@ -1,4 +1,0 @@
-# Configuration file for repo2docker
-# Use conda environment instead of Docker for faster builds
-
-buildpack: conda
